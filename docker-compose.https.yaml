@@ -1,0 +1,10 @@
+services:
+  nginx:
+    volumes:
+      - ./Docker/nginx/https.conf:/etc/nginx/conf.d/default.conf:ro
+      - type: bind
+        source: ./tls/nginx
+        target: /etc/nginx/tls
+        read_only: true
+        bind:
+          create_host_path: false

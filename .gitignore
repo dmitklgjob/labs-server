@@ -2,6 +2,7 @@
 /.env.local
 /.aws/
 /.idea/
+/tls/
 /*.tar.gz
 .build
 .deploy

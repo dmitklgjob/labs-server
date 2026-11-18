@@ -34,7 +34,7 @@ Compose лежит в `~/www/server`, Symfony — в `~/www/backend`, исход
 
 ## 3. Настроить серверное окружение
 
-Команда `ip -br -4 addr show scope global` покажет локальные IPv4-адреса. Подставьте IP сетевого интерфейса сервера и фактический адрес, по которому пользователи будут открывать сайт. Порт Nginx — `8888`. Адрес в `SITE_URL` задаётся без завершающего слеша.
+Команда `ip -br -4 addr show scope global` покажет локальные IPv4-адреса. Подставьте IP сетевого интерфейса сервера в `LAN_IP`. Для входа Vue использует Web Crypto, поэтому в `SITE_URL` укажите HTTPS-адрес без завершающего слеша или `http://localhost:8888` для проверки через SSH-туннель. Режим HTTPS для локальной сети описан ниже.
 
 Выполните этот блок один раз. Он остановится, если какой-либо из файлов уже существует:
 
@@ -43,7 +43,7 @@ Compose лежит в `~/www/server`, Symfony — в `~/www/backend`, исход
   set -eu
   cd "$HOME/www/server"
   LAN_IP=192.168.1.10
-  SITE_URL=http://192.168.1.10:8888
+  SITE_URL=http://localhost:8888
 
   if [ -e .env ] || [ -e ../backend/.env.local ]; then
     echo 'Файл .env или backend/.env.local уже существует. Проверьте их вручную.' >&2
@@ -113,13 +113,27 @@ EOF_BACKEND
 
 ```sh
 cd "$HOME/www/server"
-make init OAUTH_REDIRECT_URI=http://192.168.1.10:8888/callback ADMIN_EMAIL=admin@example.com
+make init OAUTH_REDIRECT_URI=http://localhost:8888/callback ADMIN_EMAIL=admin@example.com
 docker compose ps
 ```
 
 При первом старте PostgreSQL 17 создаст базу в томе `postgres17_data`. `make init` установит зависимости PHP, создаст ключи OAuth, применит миграции, зарегистрирует клиент Vue и создаст администратора. Сохраните пароль из вывода команды и проверьте вход через браузер.
 
 Nginx доступен на всех интерфейсах на порту `8888`, PostgreSQL — на заданном LAN IP на порту `5432`. Symfony подключается к базе по имени `postgres`. Если меняется адрес сайта, обновите redirect URI существующего OAuth-клиента `frontend`.
+
+Для проверки через `localhost` выполните на компьютере с браузером и оставьте команду запущенной:
+
+```sh
+ssh -N -L 127.0.0.1:8888:127.0.0.1:8888 admin_server@192.168.1.10
+```
+
+Подставьте пользователя и IP сервера, затем откройте `http://localhost:8888`. Если клиент OAuth уже создан, добавьте адрес туннеля из каталога `~/www/server` на сервере:
+
+```sh
+docker compose exec -T --user www-data -e APP_ENV=prod php-fpm \
+  php bin/console league:oauth2-server:update-client frontend \
+  --add-redirect-uri=http://localhost:8888/callback
+```
 
 ### Если база уже была запущена на PostgreSQL 16
 
@@ -131,6 +145,30 @@ docker compose up -d --wait postgres
 ```
 
 Compose подключит новый том `postgres17_data`. Старый том `postgres_data` сохранится. Если есть дамп, восстановите его в пустую базу PostgreSQL 17 перед запуском `make init`. Если дампа нет и нужна чистая установка, выполните шаг 5.
+
+## Включить HTTPS в локальной сети
+
+Используйте фактический IP сервера вместо `192.168.1.251`. В каталоге `~/www/server` создайте сертификат:
+
+```sh
+sh Docker/nginx/create-lan-cert.sh 192.168.1.251
+```
+
+В `~/www/server/.env` добавьте строку `COMPOSE_FILE=docker-compose.yaml:docker-compose.https.yaml`. В `~/www/backend/.env.local` задайте `DEFAULT_URI=https://192.168.1.251:8888`. Если клиент OAuth уже создан, добавьте новый адрес и переключите Nginx:
+
+```sh
+cd ~/www/server
+docker compose exec -T --user www-data -e APP_ENV=prod php-fpm \
+  php bin/console league:oauth2-server:update-client frontend \
+  --add-redirect-uri=https://192.168.1.251:8888/callback
+docker compose up -d --no-deps nginx
+```
+
+При первой установке вместо обновления существующего OAuth-клиента передайте `OAUTH_REDIRECT_URI=https://192.168.1.251:8888/callback` в `make init`.
+
+Скопируйте только `~/www/server/tls/ca.crt` на каждый компьютер с браузером и импортируйте в доверенные центры сертификации. В Firefox это **Настройки → Приватность и защита → Сертификаты → Просмотр сертификатов → Центры сертификации**. После импорта откройте `https://192.168.1.251:8888`. Закрытые ключи остаются на сервере, а каталог `tls/` исключён из Git.
+
+Сертификат сайта действует год. Для продления повторите команду генерации с тем же IP и выполните `docker compose exec nginx nginx -s reload`. Скрипт использует существующий центр сертификации.
 
 ## Последующие обновления
 
