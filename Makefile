@@ -23,7 +23,7 @@ tunnel:
 			set -- --mount "type=bind,source=$$PWD/tls/ca.crt,target=/etc/cloudflared/labs-ca.crt,readonly"; \
 		fi; \
 		TUNNEL_TOKEN="$$token" docker run --rm --network host --env TUNNEL_TOKEN "$$@" \
-			cloudflare/cloudflared:latest tunnel --no-autoupdate run
+			cloudflare/cloudflared:latest tunnel --no-autoupdate --protocol http2 run
 
 init:
 	@test -n '$(OAUTH_REDIRECT_URI)' || { echo 'Укажите OAUTH_REDIRECT_URI с адресом сайта и путём /callback.' >&2; exit 1; }

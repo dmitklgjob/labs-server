@@ -176,7 +176,7 @@ docker compose up -d --no-deps nginx
 
 ## Запустить Cloudflare Tunnel
 
-Добавьте `TUNNEL_TOKEN` в `~/www/server/.env`. Затем из каталога `~/www/server` выполните `make tunnel`. Контейнер запустится в текущем терминале. Для остановки нажмите Ctrl+C.
+Добавьте `TUNNEL_TOKEN` в `~/www/server/.env`. Затем из каталога `~/www/server` выполните `make tunnel`. Контейнер подключится к Cloudflare по HTTP/2 и будет работать в текущем терминале. Для остановки нажмите Ctrl+C.
 
 Для HTTPS с локальным сертификатом задайте в маршруте Cloudflare адрес `https://192.168.1.251:8888` и **CA Pool** `/etc/cloudflared/labs-ca.crt`. Makefile подключает туда публичный сертификат `tls/ca.crt`, если он есть. Дайте контейнеру доступ на чтение этого файла командой `chmod a+r tls/ca.crt`. Проверка TLS остаётся включённой.
 
