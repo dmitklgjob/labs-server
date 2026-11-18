@@ -1,0 +1,43 @@
+services:
+  nginx:
+    image: nginx:stable-alpine
+    restart: unless-stopped
+    ports:
+      - "8888:80"
+    volumes:
+      - ./Docker/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+      - ${FRONTEND_PUBLIC_DIR:-${HOME}/www/frontend/public}:/srv/frontend:ro
+    depends_on:
+      - php-fpm
+
+  php-fpm:
+    build:
+      context: ./Docker/php-fpm
+      pull: true
+    restart: unless-stopped
+    working_dir: /srv/backend
+    volumes:
+      - ${HOME}/www/backend:/srv/backend
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-app}
+      POSTGRES_USER: ${POSTGRES_USER:-app}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+    ports:
+      - "${POSTGRES_BIND_IP:?Set POSTGRES_BIND_IP to the server LAN address}:5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+
+volumes:
+  postgres_data:
