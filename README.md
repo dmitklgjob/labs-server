@@ -121,6 +121,8 @@ docker compose ps
 
 Nginx доступен на всех интерфейсах на порту `8888`, PostgreSQL — на заданном LAN IP на порту `5432`. Symfony подключается к базе по имени `postgres`. Если меняется адрес сайта, обновите redirect URI существующего OAuth-клиента `frontend`.
 
+Файлы лабораторных хранятся в `~/www/backend/storage/labs`. Дамп PostgreSQL содержит записи каталога, а сами файлы нужно перенести отдельно или загрузить архивы через интерфейс. Если в Symfony изменён `LABS_DIR`, укажите соответствующий абсолютный путь на хосте в `LABS_STORAGE_DIR` в файле Compose `.env`.
+
 Для проверки через `localhost` выполните на компьютере с браузером и оставьте команду запущенной:
 
 ```sh
@@ -130,9 +132,7 @@ ssh -N -L 127.0.0.1:8888:127.0.0.1:8888 admin_server@192.168.1.10
 Подставьте пользователя и IP сервера, затем откройте `http://localhost:8888`. Если клиент OAuth уже создан, добавьте адрес туннеля из каталога `~/www/server` на сервере:
 
 ```sh
-docker compose exec -T --user www-data -e APP_ENV=prod php-fpm \
-  php bin/console league:oauth2-server:update-client frontend \
-  --add-redirect-uri=http://localhost:8888/callback
+make restore-oauth-redirect OAUTH_REDIRECT_URI=http://localhost:8888/callback
 ```
 
 ### Если база уже была запущена на PostgreSQL 16
@@ -146,6 +146,12 @@ docker compose up -d --wait postgres
 
 Compose подключит новый том `postgres17_data`. Старый том `postgres_data` сохранится. Если есть дамп, восстановите его в пустую базу PostgreSQL 17 перед запуском `make init`. Если дампа нет и нужна чистая установка, выполните шаг 5.
 
+После восстановления дампа в работающем развёртывании добавьте callback текущего сайта. Цель создаст клиента `frontend`, если его нет, или добавит адрес к существующему списку:
+
+```sh
+make restore-oauth-redirect OAUTH_REDIRECT_URI=https://192.168.1.251:8888/callback
+```
+
 ## Включить HTTPS в локальной сети
 
 Используйте фактический IP сервера вместо `192.168.1.251`. В каталоге `~/www/server` создайте сертификат:
@@ -158,9 +164,7 @@ sh Docker/nginx/create-lan-cert.sh 192.168.1.251
 
 ```sh
 cd ~/www/server
-docker compose exec -T --user www-data -e APP_ENV=prod php-fpm \
-  php bin/console league:oauth2-server:update-client frontend \
-  --add-redirect-uri=https://192.168.1.251:8888/callback
+make restore-oauth-redirect OAUTH_REDIRECT_URI=https://192.168.1.251:8888/callback
 docker compose up -d --no-deps nginx
 ```
 

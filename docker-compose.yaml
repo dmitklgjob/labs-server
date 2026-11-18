@@ -8,6 +8,7 @@ services:
       - ./Docker/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
       - ./Docker/nginx/site.conf:/etc/nginx/site.conf:ro
       - ${FRONTEND_PUBLIC_DIR:-${HOME}/www/frontend/public}:/srv/frontend:ro
+      - ${LABS_STORAGE_DIR:-${HOME}/www/backend/storage/labs}:/srv/labs:ro
     depends_on:
       - php-fpm
 
