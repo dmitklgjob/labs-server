@@ -1,5 +1,5 @@
 .DEFAULT_GOAL := up
-.PHONY: up stop down init composer-install oauth-keys migrations oauth-client restore-oauth-redirect create-admin
+.PHONY: up stop down tunnel init composer-install oauth-keys migrations oauth-client restore-oauth-redirect create-admin
 
 PHP_EXEC = docker compose exec -T --user www-data -e APP_ENV=prod
 CONSOLE = $(PHP_EXEC) php-fpm php bin/console --no-interaction
@@ -13,6 +13,17 @@ stop:
 
 down:
 	docker compose down --remove-orphans
+
+tunnel:
+	@compose_env=$$(docker compose config --environment) || exit $$?; \
+		token=$$(printf '%s\n' "$$compose_env" | sed -n 's/^TUNNEL_TOKEN=//p'); \
+		test -n "$$token" || { echo 'Укажите TUNNEL_TOKEN в .env.' >&2; exit 1; }; \
+		set --; \
+		if [ -f tls/ca.crt ]; then \
+			set -- --mount "type=bind,source=$$PWD/tls/ca.crt,target=/etc/cloudflared/labs-ca.crt,readonly"; \
+		fi; \
+		TUNNEL_TOKEN="$$token" docker run --rm --network host --env TUNNEL_TOKEN "$$@" \
+			cloudflare/cloudflared:latest tunnel --no-autoupdate run
 
 init:
 	@test -n '$(OAUTH_REDIRECT_URI)' || { echo 'Укажите OAUTH_REDIRECT_URI с адресом сайта и путём /callback.' >&2; exit 1; }
