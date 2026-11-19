@@ -22,8 +22,8 @@ tunnel:
 		if [ -f tls/ca.crt ]; then \
 			set -- --mount "type=bind,source=$$PWD/tls/ca.crt,target=/etc/cloudflared/labs-ca.crt,readonly"; \
 		fi; \
-		TUNNEL_TOKEN="$$token" docker run --rm --network host --env TUNNEL_TOKEN "$$@" \
-			cloudflare/cloudflared:latest tunnel --no-autoupdate --protocol http2 run
+		docker run --rm --network host "$$@" \
+			cloudflare/cloudflared:latest tunnel --protocol http2 --no-autoupdate run --token "$$token"
 
 init:
 	@test -n '$(OAUTH_REDIRECT_URI)' || { echo 'Укажите OAUTH_REDIRECT_URI с адресом сайта и путём /callback.' >&2; exit 1; }
@@ -49,14 +49,15 @@ migrations:
 oauth-client:
 	@test -n '$(OAUTH_REDIRECT_URI)' || { echo 'Укажите OAUTH_REDIRECT_URI с адресом сайта и путём /callback.' >&2; exit 1; }
 	@clients=$$($(CONSOLE) league:oauth2-server:list-clients --columns=identifier --columns='redirect uri' --no-ansi) && \
-		if ! printf '%s\n' "$$clients" | grep -Eq '^[[:space:]]*\|[[:space:]]*frontend[[:space:]]*\|'; then \
+		if ! printf '%s\n' "$$clients" | grep -Eq '^[[:space:]]*frontend  +'; then \
 			$(CONSOLE) league:oauth2-server:create-client Frontend frontend --public \
 				--grant-type=authorization_code --grant-type=refresh_token --scope=api \
 				--redirect-uri='$(OAUTH_REDIRECT_URI)'; \
-		elif ! printf '%s\n' "$$clients" | awk -F '[|]' -v uri='$(OAUTH_REDIRECT_URI)' '\
-			$$2 ~ /^[[:space:]]*frontend[[:space:]]*$$/ { \
-				gsub(/^[[:space:]]+|[[:space:]]+$$/, "", $$3); \
-				count = split($$3, redirects, ", "); \
+		elif ! printf '%s\n' "$$clients" | awk -v uri='$(OAUTH_REDIRECT_URI)' '\
+			/^[[:space:]]*frontend  +/ { \
+				sub(/^[[:space:]]*frontend  +/, ""); \
+				sub(/[[:space:]]+$$/, ""); \
+				count = split($$0, redirects, ", "); \
 				for (i = 1; i <= count; i++) if (redirects[i] == uri) found = 1; \
 			} END { exit !found }'; then \
 			$(CONSOLE) league:oauth2-server:update-client frontend --add-redirect-uri='$(OAUTH_REDIRECT_URI)'; \
